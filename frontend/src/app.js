@@ -1,30 +1,88 @@
 import React, { useState } from "react";
-import MapView from "./mapView";
-import EldChart from "./EldChart";
+import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
+import axios from "axios";
+import Eldsheet from "./Eldsheet";
+import "leaflet/dist/leaflet.css";
+import "./App.css";
+import L from "leaflet";
 
-function App() {
+// Fix marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
+  iconUrl: require("leaflet/dist/images/marker-icon.png"),
+  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
+});
+
+const generateLogEvents = (driveHours) => {
+  const log = [];
+  log.push({ status: "On Duty", startHour: 0, endHour: 0.5, duration: 0.5, location: "Depot" });
+  log.push({ status: "On Duty", startHour: 0.5, endHour: 1.5, duration: 1, location: "Pickup" });
+  log.push({ status: "Driving", startHour: 1.5, endHour: 1.5 + driveHours, duration: driveHours, location: "Route" });
+  log.push({ status: "Off Duty", startHour: 1.5 + driveHours, endHour: 2.5 + driveHours, duration: 1, location: "Rest Stop" });
+  log.push({ status: "On Duty", startHour: 2.5 + driveHours, endHour: 3.5 + driveHours, duration: 1, location: "Dropoff" });
+  log.push({ status: "On Duty", startHour: 3.5 + driveHours, endHour: 3.75 + driveHours, duration: 0.25, location: "Depot" });
+  const used = 3.75 + driveHours;
+  if (used < 24) log.push({ status: "Off Duty", startHour: used, endHour: 24, duration: 24 - used, location: "Home" });
+  return log;
+};
+
+// Convert city name to lat/lon
+const getCoordinates = async (input) => {
+  // Check if input is lat,lon
+  if (/^\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*$/.test(input)) {
+    const [lat, lon] = input.split(",").map(Number);
+    return [lat, lon];
+  }
+
+  // Otherwise treat as city name
+  try {
+    const res = await axios.get("https://nominatim.openstreetmap.org/search", {
+      params: { q: input, format: "json", limit: 1 },
+    });
+    if (res.data && res.data[0]) {
+      return [parseFloat(res.data[0].lat), parseFloat(res.data[0].lon)];
+    } else {
+      throw new Error(`City not found: ${input}`);
+    }
+  } catch (err) {
+    throw new Error(`Geocoding error for ${input}: ${err.message}`);
+  }
+};
+
+export default function App() {
   const [inputs, setInputs] = useState({
-    current: "24.8607,67.0011", // Karachi
-    pickup: "24.8607,67.0011",
-    dropoff: "33.6844,73.0479", // Islamabad
-    current_cycle_used_hours: 0,
+    current: "Karachi", // Default city name
+    dropoff: "Islamabad", // Default city name
   });
+  const [routeCoords, setRouteCoords] = useState([]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) =>
-    setInputs({ ...inputs, [e.target.name]: e.target.value });
+  const handleChange = (e) => setInputs({ ...inputs, [e.target.name]: e.target.value });
 
   const planTrip = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/trip/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(inputs),
-      });
-      const data = await res.json();
-      setResult(data);
+      const [startLat, startLon] = await getCoordinates(inputs.current);
+      const [endLat, endLon] = await getCoordinates(inputs.dropoff);
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+      const res = await axios.get(url);
+
+      if (res.data?.routes?.[0]) {
+        const route = res.data.routes[0];
+        const coords = route.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+        setRouteCoords(coords);
+
+        const distanceMiles = route.distance / 1609.344;
+        const estimatedDriveHours = route.duration / 3600;
+
+        const logEvents = generateLogEvents(estimatedDriveHours);
+        setResult({ distanceMiles, estimatedDriveHours, logEvents });
+      } else {
+        alert("Route calculation failed.");
+      }
     } catch (err) {
       alert(err.message);
     } finally {
@@ -32,104 +90,58 @@ function App() {
     }
   };
 
-  const calculateFuelStops = (route) => {
-    if (!route?.osrm_geometry?.coordinates) return [];
-    const coords = route.osrm_geometry.coordinates;
-    const numStops = Math.floor(route.summary?.distance_miles / 1000) || 0;
-    if (numStops === 0) return [];
-    const step = Math.floor(coords.length / (numStops + 1));
-    const stops = [];
-    for (let i = 1; i <= numStops; i++) {
-      stops.push([coords[i * step][0], coords[i * step][1]]);
-    }
-    return stops;
-  };
-
-  const calculateRestStops = (route) => {
-    if (!route?.osrm_geometry?.coordinates) return [];
-    const totalHours = route.summary?.estimated_drive_hours || 0;
-    const restCount = Math.floor(totalHours / 8);
-    if (restCount === 0) return [];
-    const coords = route.osrm_geometry.coordinates;
-    const step = Math.floor(coords.length / (restCount + 1));
-    const stops = [];
-    for (let i = 1; i <= restCount; i++) {
-      stops.push([coords[i * step][0], coords[i * step][1]]);
-    }
-    return stops;
-  };
-
   return (
     <div className="app-container">
-      <div className="content-wrapper">
-        {/* Title */}
-        <h1>Trip Planner</h1>
-
-        {/* Trip Plan Form */}
-        <div className="box trip-form">
-          <h2>Trip Plan Details</h2>
-          {["current","pickup","dropoff"].map(name => (
-            <div key={name} className="input-group">
-              <label>
-                {name.charAt(0).toUpperCase() + name.slice(1)} (lat,lon)
-              </label>
-              <input
-                type="text"
-                name={name}
-                value={inputs[name]}
-                onChange={handleChange}
-              />
-            </div>
-          ))}
-          <div className="input-group">
-            <label>Current Cycle Used (hrs)</label>
+      {/* Input Box */}
+      <div className="input-box">
+        <h1>Dynamic Trip Planner</h1>
+        {["current", "dropoff"].map((name) => (
+          <div key={name} className="input-group">
+            <label>{name.charAt(0).toUpperCase() + name.slice(1)} (city name or lat,lon):</label>
             <input
-              type="number"
-              name="current_cycle_used_hours"
-              value={inputs.current_cycle_used_hours}
+              type="text"
+              name={name}
+              value={inputs[name]}
               onChange={handleChange}
+              placeholder="Type city or lat,lon"
             />
           </div>
-          <button onClick={planTrip} disabled={loading} className="plan-button">
-            {loading ? "Planning Trip..." : "Plan Trip"}
+        ))}
+        <div className="button-wrapper">
+          <button className="plan-button" onClick={planTrip} disabled={loading}>
+            {loading ? "Planning..." : "Plan Trip"}
           </button>
         </div>
-
-        {/* Map */}
-        {result && (
-          <div className="box animate-fadeIn">
-            <h2>Route Map</h2>
-            <MapView
-              geometry={result.osrm_geometry}
-              current={inputs.current.split(",").map(Number)}
-              pickup={inputs.pickup.split(",").map(Number)}
-              dropoff={inputs.dropoff.split(",").map(Number)}
-              fuelStops={calculateFuelStops(result)}
-              restStops={calculateRestStops(result)}
-            />
-          </div>
-        )}
-
-        {/* Trip Summary & ELD Logs */}
-        {result && (
-          <div className="grid">
-            <div className="box animate-fadeIn">
-              <h2>Trip Summary</h2>
-              <p><strong>Distance:</strong> {result.summary.distance_miles} miles</p>
-              <p><strong>Estimated Hours:</strong> {result.summary.estimated_drive_hours} h</p>
-              <p><strong>Fuel Stops (est):</strong> {result.summary.fuel_stops_estimated}</p>
-              <p><strong>Rest Stops (est):</strong> {result.summary.rest_stops_estimated}</p>
-              <p><strong>Cycle Remaining:</strong> {result.summary.cycle_remaining_hours} h</p>
-            </div>
-            <div className="box animate-fadeIn">
-              <h2>ELD Daily Logs</h2>
-              <EldChart days={result.days_plan} />
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Route Summary */}
+      {result && (
+        <div className="route-summary">
+          <h2>Route Summary</h2>
+          <p><strong>Distance:</strong> {result.distanceMiles.toFixed(2)} miles</p>
+          <p><strong>Estimated Drive Hours:</strong> {result.estimatedDriveHours.toFixed(2)} h</p>
+        </div>
+      )}
+
+      {/* Map */}
+      {result && routeCoords.length > 0 && (
+        <div className="map-box">
+          <MapContainer center={routeCoords[0]} zoom={6} style={{ height: "100%", width: "100%" }}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <Polyline positions={routeCoords} color="blue" weight={5} />
+            <Marker position={routeCoords[0]}><Popup>Start</Popup></Marker>
+            <Marker position={routeCoords[routeCoords.length - 1]}><Popup>End</Popup></Marker>
+          </MapContainer>
+        </div>
+      )}
+
+      {/* ELD Log */}
+      {result && (
+        <div className="eld-box">
+          <h2>ELD Log</h2>
+          <Eldsheet logEvents={result.logEvents} />
+        </div>
+      )}
     </div>
   );
 }
-
-export default App;

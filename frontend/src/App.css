@@ -1,38 +1,157 @@
-.App {
-  text-align: center;
+/* ========================
+   Trip Planner Styles
+   ======================== */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(to bottom right, #f4f6f8, #e9eff5);
+  color: #333;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+/* Main App Container */
+.app-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  min-height: 100vh;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
-.App-link {
-  color: #61dafb;
+/* Input Box / Form */
+.input-box {
+  width: 100%;
+  max-width: 500px;
+  padding: 40px 30px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 40px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+.input-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.input-box h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #007BFF;
+  margin-bottom: 10px;
+}
+
+/* Input Groups */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.input-group label {
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #555;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #007BFF;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.25);
+}
+
+/* Buttons */
+.button-wrapper {
+  width: 100%;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.plan-button {
+  padding: 12px 25px;
+  border-radius: 8px;
+  border: none;
+  background-color: #007BFF;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.plan-button:hover {
+  background-color: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.plan-button:disabled {
+  background-color: #a0c4ff;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Route Summary and ELD Box */
+.route-summary,
+.eld-box {
+  background-color: #fff;
+  padding: 25px 30px;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 900px;
+  margin-bottom: 25px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.route-summary:hover,
+.eld-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Map Box */
+.map-box {
+  height: 450px;
+  width: 90%;
+  max-width: 1000px;
+  margin-bottom: 30px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.map-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .input-box {
+    padding: 30px 20px;
   }
-  to {
-    transform: rotate(360deg);
+
+  .map-box {
+    height: 300px;
   }
 }
