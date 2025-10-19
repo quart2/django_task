@@ -4,7 +4,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-test-key-for-demo-only'
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']  # allow all for local dev
 
@@ -74,3 +74,4 @@ STATIC_URL = '/static/'
 CORS_ALLOW_ALL_ORIGINS = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
